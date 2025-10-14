@@ -23,25 +23,72 @@ npm install
 npm install --save-dev electron electron-builder
 ```
 
-## Шаг 4: Добавление скриптов в package.json
-Откройте `package.json` и добавьте/измените следующие поля:
+## Шаг 4: Редактирование package.json
+
+Откройте файл `package.json` в корне проекта. Он будет выглядеть примерно так:
+
 ```json
 {
   "name": "empathetic-designer",
-  "version": "1.0.0",
-  "main": "electron/main.js",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "electron": "electron .",
-    "electron:dev": "npm run dev & electron .",
-    "electron:build": "npm run build && electron-builder",
-    "electron:build:win": "npm run build && electron-builder --win"
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    ...
   }
 }
 ```
 
-⚠️ **ВАЖНО**: Поле `"main": "electron/main.js"` должно быть на уровне корня объекта, не внутри scripts!
+**Что нужно изменить:**
+
+1. **Добавьте поле `"main"`** сразу после `"type": "module",` (на том же уровне, не внутри scripts):
+```json
+"main": "electron/main.js",
+```
+
+2. **Добавьте новые скрипты** в секцию `"scripts"`:
+```json
+"electron": "electron .",
+"electron:dev": "npm run dev & electron .",
+"electron:build": "npm run build && electron-builder",
+"electron:build:win": "npm run build && electron-builder --win"
+```
+
+**После изменений package.json должен выглядеть так:**
+
+```json
+{
+  "name": "empathetic-designer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron:dev": "npm run dev & electron .",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    ...
+  }
+}
+```
+
+⚠️ **ВАЖНО**: 
+- Не забудьте запятые после каждой строки (кроме последней в каждой секции)
+- `"main"` должен быть на одном уровне с `"name"`, `"version"`, `"scripts"` и т.д.
+- Новые скрипты добавляются внутрь существующей секции `"scripts"`
 
 ## Шаг 5: Настройка переменных окружения
 Файл `.env` должен быть автоматически экспортирован из Lovable.
