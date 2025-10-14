@@ -24,17 +24,24 @@ npm install --save-dev electron electron-builder
 ```
 
 ## Шаг 4: Добавление скриптов в package.json
-Откройте `package.json` и добавьте в секцию `"scripts"`:
+Откройте `package.json` и добавьте/измените следующие поля:
 ```json
 {
+  "name": "empathetic-designer",
+  "version": "1.0.0",
+  "main": "electron/main.js",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "electron": "electron .",
+    "electron:dev": "npm run dev & electron .",
     "electron:build": "npm run build && electron-builder",
     "electron:build:win": "npm run build && electron-builder --win"
-  },
-  "main": "electron/main.js"
+  }
 }
 ```
+
+⚠️ **ВАЖНО**: Поле `"main": "electron/main.js"` должно быть на уровне корня объекта, не внутри scripts!
 
 ## Шаг 5: Настройка переменных окружения
 Файл `.env` должен быть автоматически экспортирован из Lovable.
