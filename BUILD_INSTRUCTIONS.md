@@ -130,7 +130,14 @@ npm run electron
 **Решение:**
 1. **Закройте приложение** если оно запущено (проверьте трей и диспетчер задач)
 2. **Удалите папку release**:
-   ```bash
+   
+   Для PowerShell:
+   ```powershell
+   Remove-Item -Path release -Recurse -Force
+   ```
+   
+   Для CMD:
+   ```cmd
    rmdir /s /q release
    ```
 3. **Попробуйте снова**:
