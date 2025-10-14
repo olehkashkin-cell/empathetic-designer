@@ -1,15 +1,21 @@
 # Инструкции по сборке .exe установщика
 
 ## Шаг 1: Экспорт проекта
-1. В Lovable нажмите GitHub → Connect to GitHub
-2. Создайте репозиторий и экспортируйте проект
+⚠️ **ВАЖНО**: Нельзя просто скачать файлы - нужен полный экспорт!
 
-## Шаг 2: Локальная настройка
+1. В Lovable нажмите кнопку **GitHub** в правом верхнем углу
+2. Выберите **Connect to GitHub** (если еще не подключен)
+3. Создайте новый репозиторий или выберите существующий
+4. Дождитесь завершения экспорта
+
+## Шаг 2: Клонирование репозитория
 Склонируйте репозиторий на компьютер:
 ```bash
 git clone <ваш-репозиторий-url>
 cd <название-проекта>
 ```
+
+⚠️ Если вы видите ошибку "package.json not found", значит вы пропустили Шаг 1!
 
 ## Шаг 3: Установка зависимостей
 ```bash
@@ -31,14 +37,15 @@ npm install --save-dev electron electron-builder
 ```
 
 ## Шаг 5: Настройка переменных окружения
-Создайте файл `.env` с вашими API ключами:
+Файл `.env` должен быть автоматически экспортирован из Lovable.
+Проверьте что он содержит:
 ```
-VITE_OPENAI_API_KEY=your_openai_api_key
-VITE_ELEVENLABS_API_KEY=your_elevenlabs_api_key
-VITE_ELEVENLABS_VOICE_ID=your_voice_id
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
+VITE_SUPABASE_PROJECT_ID=nfxpupmeddcxqaajaiyq
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
+VITE_SUPABASE_URL=https://nfxpupmeddcxqaajaiyq.supabase.co
 ```
+
+✅ Эти переменные уже настроены автоматически при экспорте из Lovable
 
 ## Шаг 6: Сборка приложения
 ```bash
