@@ -38,6 +38,7 @@ const Index = () => {
 
   const startListening = async () => {
     try {
+      console.log('startListening called, isActive:', isActive);
       setStatusText('Слушаю...');
       setIsListening(true);
       
@@ -47,9 +48,11 @@ const Index = () => {
           setStatusText('Слушаю...');
         },
         onSpeechEnd: async () => {
-          console.log('Speech ended, processing...');
-          if (recorderRef.current && isActive) {
-            await stopListening();
+          console.log('Speech ended, processing... isActive:', isActive);
+          // Используем ref для получения актуального значения isActive
+          if (recorderRef.current) {
+            // Немедленно вызываем stopListening
+            stopListening();
           }
         },
         onVolumeChange: (volume) => {
@@ -58,6 +61,7 @@ const Index = () => {
       });
       
       await recorderRef.current.start();
+      console.log('Recorder started successfully');
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -72,20 +76,31 @@ const Index = () => {
   };
 
   const stopListening = async () => {
-    if (!recorderRef.current || !isActive) return;
+    console.log('stopListening called, recorderRef:', !!recorderRef.current, 'isActive:', isActive);
+    
+    if (!recorderRef.current) {
+      console.log('No recorder ref, returning');
+      return;
+    }
 
     try {
       setStatusText('Обрабатываю...');
+      console.log('Stopping recorder...');
       const audioBase64 = await recorderRef.current.stop();
+      console.log('Recorder stopped, audio length:', audioBase64.length);
       setIsListening(false);
 
       // Speech to text
+      console.log('Calling speech-to-text...');
       const { data: transcriptionData, error: transcriptionError } = await supabase.functions.invoke(
         'speech-to-text',
         { body: { audio: audioBase64 } }
       );
 
-      if (transcriptionError) throw transcriptionError;
+      if (transcriptionError) {
+        console.error('Transcription error:', transcriptionError);
+        throw transcriptionError;
+      }
 
       const userText = transcriptionData.text;
       console.log('User said:', userText);
@@ -102,24 +117,32 @@ const Index = () => {
       setStatusText('Думаю...');
 
       // Get GPT response
+      console.log('Calling chat-gpt with message:', userText);
       const { data: chatData, error: chatError } = await supabase.functions.invoke(
         'chat-gpt',
         { body: { message: userText } }
       );
 
-      if (chatError) throw chatError;
+      if (chatError) {
+        console.error('Chat error:', chatError);
+        throw chatError;
+      }
 
       const gptReply = chatData.reply;
       console.log('GPT replied:', gptReply);
       setStatusText('Говорю...');
 
       // Convert to speech
+      console.log('Calling text-to-speech...');
       const { data: speechData, error: speechError } = await supabase.functions.invoke(
         'text-to-speech',
         { body: { text: gptReply } }
       );
 
-      if (speechError) throw speechError;
+      if (speechError) {
+        console.error('Speech error:', speechError);
+        throw speechError;
+      }
 
       // Play audio
       const audioBlob = base64ToBlob(speechData.audioContent, 'audio/mpeg');
