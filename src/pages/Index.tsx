@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import VoiceOrb from '@/components/VoiceOrb';
 import { AudioRecorder } from '@/utils/audioRecorder';
@@ -11,6 +11,7 @@ const Index = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusText, setStatusText] = useState('Готов к общению');
   const [isActive, setIsActive] = useState(false);
+  const [shouldProcessAudio, setShouldProcessAudio] = useState(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
@@ -41,19 +42,16 @@ const Index = () => {
       console.log('startListening called, isActive:', isActive);
       setStatusText('Слушаю...');
       setIsListening(true);
+      setShouldProcessAudio(false);
       
       recorderRef.current = new AudioRecorder({
         onSpeechStart: () => {
           console.log('Speech started');
           setStatusText('Слушаю...');
         },
-        onSpeechEnd: async () => {
-          console.log('Speech ended, processing... isActive:', isActive);
-          // Используем ref для получения актуального значения isActive
-          if (recorderRef.current) {
-            // Немедленно вызываем stopListening
-            stopListening();
-          }
+        onSpeechEnd: () => {
+          console.log('Speech ended, setting shouldProcessAudio to true');
+          setShouldProcessAudio(true);
         },
         onVolumeChange: (volume) => {
           // Можно использовать для визуализации
@@ -74,6 +72,15 @@ const Index = () => {
       setStatusText('Готов к общению');
     }
   };
+
+  // Effect to handle audio processing when speech ends
+  useEffect(() => {
+    if (shouldProcessAudio && isActive && recorderRef.current) {
+      console.log('useEffect triggered: processing audio');
+      setShouldProcessAudio(false);
+      stopListening();
+    }
+  }, [shouldProcessAudio, isActive]);
 
   const stopListening = async () => {
     console.log('stopListening called, recorderRef:', !!recorderRef.current, 'isActive:', isActive);
