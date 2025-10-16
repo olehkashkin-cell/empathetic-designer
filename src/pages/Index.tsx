@@ -41,7 +41,22 @@ const Index = () => {
       setStatusText('Слушаю...');
       setIsListening(true);
       
-      recorderRef.current = new AudioRecorder();
+      recorderRef.current = new AudioRecorder({
+        onSpeechStart: () => {
+          console.log('Speech started');
+          setStatusText('Слушаю...');
+        },
+        onSpeechEnd: async () => {
+          console.log('Speech ended, processing...');
+          if (recorderRef.current && isActive) {
+            await stopListening();
+          }
+        },
+        onVolumeChange: (volume) => {
+          // Можно использовать для визуализации
+        }
+      });
+      
       await recorderRef.current.start();
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -51,12 +66,13 @@ const Index = () => {
         variant: 'destructive',
       });
       setIsListening(false);
+      setIsActive(false);
       setStatusText('Готов к общению');
     }
   };
 
   const stopListening = async () => {
-    if (!recorderRef.current) return;
+    if (!recorderRef.current || !isActive) return;
 
     try {
       setStatusText('Обрабатываю...');
@@ -73,6 +89,16 @@ const Index = () => {
 
       const userText = transcriptionData.text;
       console.log('User said:', userText);
+      
+      // Проверяем, не пустой ли текст
+      if (!userText || userText.trim().length === 0) {
+        console.log('Empty transcription, continuing to listen...');
+        if (isActive) {
+          await startListening();
+        }
+        return;
+      }
+      
       setStatusText('Думаю...');
 
       // Get GPT response
@@ -124,13 +150,13 @@ const Index = () => {
 
   // Функция для прерывания AI во время речи
   const interruptSpeech = async () => {
-    if (isSpeaking && audioRef.current) {
+    if (isSpeaking && audioRef.current && isActive) {
+      console.log('Interrupting AI speech');
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setIsSpeaking(false);
-      if (isActive) {
-        await startListening();
-      }
+      // Немедленно начать слушать
+      await startListening();
     }
   };
 
