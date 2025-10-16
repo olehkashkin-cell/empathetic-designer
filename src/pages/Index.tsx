@@ -13,6 +13,7 @@ const Index = () => {
   const [isActive, setIsActive] = useState(false);
   const [shouldProcessAudio, setShouldProcessAudio] = useState(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const interruptRecorderRef = useRef<AudioRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
@@ -151,13 +152,17 @@ const Index = () => {
         throw speechError;
       }
 
-      // Play audio
+      // Play audio and start monitoring for interruption
       const audioBlob = base64ToBlob(speechData.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
       if (audioRef.current && isActive) {
         audioRef.current.src = audioUrl;
         setIsSpeaking(true);
+        
+        // Start monitoring for user interruption
+        await startInterruptionMonitoring();
+        
         await audioRef.current.play();
       } else {
         setStatusText('Готов к общению');
@@ -178,14 +183,51 @@ const Index = () => {
     }
   };
 
+  // Start monitoring microphone for interruption during AI speech
+  const startInterruptionMonitoring = async () => {
+    try {
+      console.log('Starting interruption monitoring');
+      interruptRecorderRef.current = new AudioRecorder({
+        onSpeechStart: async () => {
+          console.log('User speech detected during AI response - interrupting');
+          await interruptSpeech();
+        },
+        onSpeechEnd: () => {
+          // Do nothing, we only care about speech start
+        }
+      });
+      
+      await interruptRecorderRef.current.start();
+    } catch (error) {
+      console.error('Error starting interruption monitoring:', error);
+    }
+  };
+
+  // Stop interruption monitoring
+  const stopInterruptionMonitoring = () => {
+    if (interruptRecorderRef.current) {
+      console.log('Stopping interruption monitoring');
+      interruptRecorderRef.current.stop();
+      interruptRecorderRef.current = null;
+    }
+  };
+
   // Функция для прерывания AI во время речи
   const interruptSpeech = async () => {
-    if (isSpeaking && audioRef.current && isActive) {
-      console.log('Interrupting AI speech');
+    console.log('Interrupting AI speech');
+    
+    // Stop interruption monitoring
+    stopInterruptionMonitoring();
+    
+    if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      setIsSpeaking(false);
-      // Немедленно начать слушать
+    }
+    
+    setIsSpeaking(false);
+    
+    // Немедленно начать слушать
+    if (isActive) {
       await startListening();
     }
   };
@@ -201,6 +243,11 @@ const Index = () => {
   };
 
   const handleAudioEnded = async () => {
+    console.log('Audio playback ended');
+    
+    // Stop interruption monitoring
+    stopInterruptionMonitoring();
+    
     setIsSpeaking(false);
     if (isActive) {
       // Автоматически начать слушать снова
