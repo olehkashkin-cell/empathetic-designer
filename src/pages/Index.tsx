@@ -10,14 +10,28 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusText, setStatusText] = useState('Готов к общению');
+  const [isActive, setIsActive] = useState(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const handleVoiceClick = async () => {
-    if (isListening) {
-      await stopListening();
+    if (isActive) {
+      // Остановить весь диалог
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      if (recorderRef.current) {
+        recorderRef.current.stop();
+      }
+      setIsActive(false);
+      setIsListening(false);
+      setIsSpeaking(false);
+      setStatusText('Готов к общению');
     } else {
+      // Начать диалог
+      setIsActive(true);
       await startListening();
     }
   };
@@ -85,12 +99,13 @@ const Index = () => {
       const audioBlob = base64ToBlob(speechData.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      if (audioRef.current) {
+      if (audioRef.current && isActive) {
         audioRef.current.src = audioUrl;
         setIsSpeaking(true);
         await audioRef.current.play();
+      } else {
+        setStatusText('Готов к общению');
       }
-
     } catch (error) {
       console.error('Error processing voice:', error);
       toast({
@@ -98,9 +113,27 @@ const Index = () => {
         description: 'Не удалось обработать запрос',
         variant: 'destructive',
       });
-      setStatusText('Готов к общению');
+      if (isActive) {
+        // При ошибке продолжить слушать
+        await startListening();
+      } else {
+        setStatusText('Готов к общению');
+      }
     }
   };
+
+  // Функция для прерывания AI во время речи
+  const interruptSpeech = async () => {
+    if (isSpeaking && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsSpeaking(false);
+      if (isActive) {
+        await startListening();
+      }
+    }
+  };
+
 
   const base64ToBlob = (base64: string, type: string): Blob => {
     const binaryString = atob(base64);
@@ -111,9 +144,14 @@ const Index = () => {
     return new Blob([bytes], { type });
   };
 
-  const handleAudioEnded = () => {
+  const handleAudioEnded = async () => {
     setIsSpeaking(false);
-    setStatusText('Готов к общению');
+    if (isActive) {
+      // Автоматически начать слушать снова
+      await startListening();
+    } else {
+      setStatusText('Готов к общению');
+    }
   };
 
   const handleClearCache = () => {
@@ -135,7 +173,10 @@ const Index = () => {
         className="hidden"
       />
       
-      <div className="flex-1 flex items-center justify-center">
+      <div 
+        className="flex-1 flex items-center justify-center cursor-pointer"
+        onClick={isSpeaking ? interruptSpeech : undefined}
+      >
         <VoiceOrb isListening={isListening} isSpeaking={isSpeaking} />
       </div>
 
@@ -163,7 +204,7 @@ const Index = () => {
           className="flex-1 bg-accent text-background hover:bg-accent/90 rounded-2xl shadow-[0_0_20px_rgba(0,191,255,0.5)]"
         >
           <Mic className="mr-2 h-5 w-5" />
-          {isListening ? 'Остановить' : 'Начать диалог'}
+          {isActive ? 'Остановить диалог' : 'Начать диалог'}
         </Button>
 
         <Button
