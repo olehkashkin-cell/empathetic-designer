@@ -48,9 +48,9 @@ export class AudioRecorder {
   }
 
   private startVAD() {
-    const SPEECH_THRESHOLD = 25; // Minimum volume to detect speech
-    const SILENCE_DURATION = 1500; // ms of silence to consider speech ended
-    const MIN_SPEECH_DURATION = 500; // Minimum speech duration before considering it valid
+    const SPEECH_THRESHOLD = 15; // Minimum volume to detect speech (lowered for better detection)
+    const SILENCE_DURATION = 800; // ms of silence to consider speech ended (reduced for faster response)
+    const MIN_SPEECH_DURATION = 300; // Minimum speech duration before considering it valid (reduced)
 
     let speechStartTime = 0;
     const bufferLength = this.analyser!.frequencyBinCount;
