@@ -11,6 +11,7 @@ const Index = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusText, setStatusText] = useState('Готов к общению');
   const [isActive, setIsActive] = useState(false);
+  const isActiveRef = useRef(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
@@ -26,12 +27,14 @@ const Index = () => {
         recorderRef.current.stop();
       }
       setIsActive(false);
+      isActiveRef.current = false;
       setIsListening(false);
       setIsSpeaking(false);
       setStatusText('Готов к общению');
     } else {
       // Начать диалог
       setIsActive(true);
+      isActiveRef.current = true;
       await startListening();
     }
   };
@@ -43,10 +46,16 @@ const Index = () => {
       
       recorderRef.current = new AudioRecorder({
         onSpeechStart: () => {
+          // Прервать AI если он говорит
+          if (audioRef.current && !audioRef.current.paused) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            setIsSpeaking(false);
+          }
           setStatusText('Слушаю...');
         },
         onSpeechEnd: async () => {
-          if (recorderRef.current) {
+          if (recorderRef.current && isActiveRef.current) {
             await stopListening();
           }
         },
@@ -65,12 +74,13 @@ const Index = () => {
       });
       setIsListening(false);
       setIsActive(false);
+      isActiveRef.current = false;
       setStatusText('Готов к общению');
     }
   };
 
   const stopListening = async () => {
-    if (!recorderRef.current || !isActive) {
+    if (!recorderRef.current || !isActiveRef.current) {
       return;
     }
 
@@ -90,7 +100,7 @@ const Index = () => {
       const userText = transcriptionData.text;
       
       if (!userText || userText.trim().length === 0) {
-        if (isActive) {
+        if (isActiveRef.current) {
           await startListening();
         }
         return;
@@ -121,7 +131,7 @@ const Index = () => {
       const audioBlob = base64ToBlob(speechData.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      if (audioRef.current && isActive) {
+      if (audioRef.current && isActiveRef.current) {
         audioRef.current.src = audioUrl;
         setIsSpeaking(true);
         await audioRef.current.play();
@@ -135,7 +145,7 @@ const Index = () => {
         description: 'Не удалось обработать запрос',
         variant: 'destructive',
       });
-      if (isActive) {
+      if (isActiveRef.current) {
         // При ошибке продолжить слушать
         await startListening();
       } else {
@@ -145,7 +155,7 @@ const Index = () => {
   };
 
   const interruptSpeech = async () => {
-    if (isSpeaking && audioRef.current && isActive) {
+    if (isSpeaking && audioRef.current && isActiveRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setIsSpeaking(false);
@@ -165,7 +175,7 @@ const Index = () => {
 
   const handleAudioEnded = async () => {
     setIsSpeaking(false);
-    if (isActive) {
+    if (isActiveRef.current) {
       // Автоматически начать слушать снова
       await startListening();
     } else {
