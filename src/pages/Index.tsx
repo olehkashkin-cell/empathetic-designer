@@ -55,7 +55,9 @@ const Index = () => {
           setStatusText('Слушаю...');
         },
         onSpeechEnd: async () => {
+          console.log('Speech ended, isActiveRef:', isActiveRef.current);
           if (recorderRef.current && isActiveRef.current) {
+            console.log('Calling stopListening...');
             await stopListening();
           }
         },
@@ -80,24 +82,33 @@ const Index = () => {
   };
 
   const stopListening = async () => {
+    console.log('stopListening called, isActiveRef:', isActiveRef.current);
     if (!recorderRef.current || !isActiveRef.current) {
+      console.log('Exiting stopListening early');
       return;
     }
 
     try {
       setStatusText('Обрабатываю...');
+      console.log('Stopping recorder...');
       const audioBase64 = await recorderRef.current.stop();
+      console.log('Audio stopped, length:', audioBase64.length);
       setIsListening(false);
 
       // Speech to text
+      console.log('Calling speech-to-text...');
       const { data: transcriptionData, error: transcriptionError } = await supabase.functions.invoke(
         'speech-to-text',
         { body: { audio: audioBase64 } }
       );
 
-      if (transcriptionError) throw transcriptionError;
+      if (transcriptionError) {
+        console.error('Transcription error:', transcriptionError);
+        throw transcriptionError;
+      }
 
       const userText = transcriptionData.text;
+      console.log('Transcribed text:', userText);
       
       if (!userText || userText.trim().length === 0) {
         if (isActiveRef.current) {
