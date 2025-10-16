@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import VoiceOrb from '@/components/VoiceOrb';
 import { AudioRecorder } from '@/utils/audioRecorder';
@@ -11,7 +11,7 @@ const Index = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusText, setStatusText] = useState('Готов к общению');
   const [isActive, setIsActive] = useState(false);
-  const isActiveRef = useRef(false);
+  const [shouldProcessAudio, setShouldProcessAudio] = useState(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
@@ -27,39 +27,31 @@ const Index = () => {
         recorderRef.current.stop();
       }
       setIsActive(false);
-      isActiveRef.current = false;
       setIsListening(false);
       setIsSpeaking(false);
       setStatusText('Готов к общению');
     } else {
       // Начать диалог
       setIsActive(true);
-      isActiveRef.current = true;
       await startListening();
     }
   };
 
   const startListening = async () => {
     try {
+      console.log('startListening called, isActive:', isActive);
       setStatusText('Слушаю...');
       setIsListening(true);
+      setShouldProcessAudio(false);
       
       recorderRef.current = new AudioRecorder({
         onSpeechStart: () => {
-          // Прервать AI если он говорит
-          if (audioRef.current && !audioRef.current.paused) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            setIsSpeaking(false);
-          }
+          console.log('Speech started');
           setStatusText('Слушаю...');
         },
-        onSpeechEnd: async () => {
-          console.log('Speech ended, isActiveRef:', isActiveRef.current);
-          if (recorderRef.current && isActiveRef.current) {
-            console.log('Calling stopListening...');
-            await stopListening();
-          }
+        onSpeechEnd: () => {
+          console.log('Speech ended, setting shouldProcessAudio to true');
+          setShouldProcessAudio(true);
         },
         onVolumeChange: (volume) => {
           // Можно использовать для визуализации
@@ -67,6 +59,7 @@ const Index = () => {
       });
       
       await recorderRef.current.start();
+      console.log('Recorder started successfully');
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -76,15 +69,24 @@ const Index = () => {
       });
       setIsListening(false);
       setIsActive(false);
-      isActiveRef.current = false;
       setStatusText('Готов к общению');
     }
   };
 
+  // Effect to handle audio processing when speech ends
+  useEffect(() => {
+    if (shouldProcessAudio && isActive && recorderRef.current) {
+      console.log('useEffect triggered: processing audio');
+      setShouldProcessAudio(false);
+      stopListening();
+    }
+  }, [shouldProcessAudio, isActive]);
+
   const stopListening = async () => {
-    console.log('stopListening called, isActiveRef:', isActiveRef.current);
-    if (!recorderRef.current || !isActiveRef.current) {
-      console.log('Exiting stopListening early');
+    console.log('stopListening called, recorderRef:', !!recorderRef.current, 'isActive:', isActive);
+    
+    if (!recorderRef.current) {
+      console.log('No recorder ref, returning');
       return;
     }
 
@@ -92,7 +94,7 @@ const Index = () => {
       setStatusText('Обрабатываю...');
       console.log('Stopping recorder...');
       const audioBase64 = await recorderRef.current.stop();
-      console.log('Audio stopped, length:', audioBase64.length);
+      console.log('Recorder stopped, audio length:', audioBase64.length);
       setIsListening(false);
 
       // Speech to text
@@ -108,10 +110,12 @@ const Index = () => {
       }
 
       const userText = transcriptionData.text;
-      console.log('Transcribed text:', userText);
+      console.log('User said:', userText);
       
+      // Проверяем, не пустой ли текст
       if (!userText || userText.trim().length === 0) {
-        if (isActiveRef.current) {
+        console.log('Empty transcription, continuing to listen...');
+        if (isActive) {
           await startListening();
         }
         return;
@@ -120,29 +124,38 @@ const Index = () => {
       setStatusText('Думаю...');
 
       // Get GPT response
+      console.log('Calling chat-gpt with message:', userText);
       const { data: chatData, error: chatError } = await supabase.functions.invoke(
         'chat-gpt',
         { body: { message: userText } }
       );
 
-      if (chatError) throw chatError;
+      if (chatError) {
+        console.error('Chat error:', chatError);
+        throw chatError;
+      }
 
       const gptReply = chatData.reply;
+      console.log('GPT replied:', gptReply);
       setStatusText('Говорю...');
 
       // Convert to speech
+      console.log('Calling text-to-speech...');
       const { data: speechData, error: speechError } = await supabase.functions.invoke(
         'text-to-speech',
         { body: { text: gptReply } }
       );
 
-      if (speechError) throw speechError;
+      if (speechError) {
+        console.error('Speech error:', speechError);
+        throw speechError;
+      }
 
       // Play audio
       const audioBlob = base64ToBlob(speechData.audioContent, 'audio/mpeg');
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      if (audioRef.current && isActiveRef.current) {
+      if (audioRef.current && isActive) {
         audioRef.current.src = audioUrl;
         setIsSpeaking(true);
         await audioRef.current.play();
@@ -156,7 +169,7 @@ const Index = () => {
         description: 'Не удалось обработать запрос',
         variant: 'destructive',
       });
-      if (isActiveRef.current) {
+      if (isActive) {
         // При ошибке продолжить слушать
         await startListening();
       } else {
@@ -165,11 +178,14 @@ const Index = () => {
     }
   };
 
+  // Функция для прерывания AI во время речи
   const interruptSpeech = async () => {
-    if (isSpeaking && audioRef.current && isActiveRef.current) {
+    if (isSpeaking && audioRef.current && isActive) {
+      console.log('Interrupting AI speech');
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setIsSpeaking(false);
+      // Немедленно начать слушать
       await startListening();
     }
   };
@@ -186,7 +202,7 @@ const Index = () => {
 
   const handleAudioEnded = async () => {
     setIsSpeaking(false);
-    if (isActiveRef.current) {
+    if (isActive) {
       // Автоматически начать слушать снова
       await startListening();
     } else {
