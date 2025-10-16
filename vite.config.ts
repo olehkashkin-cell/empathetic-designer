@@ -10,6 +10,10 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  optimizeDeps: {
+    force: true,
+    include: ['react', 'react-dom', 'react-dom/client']
+  },
   plugins: [
     react(), 
     mode === "development" && componentTagger(),
