@@ -147,24 +147,9 @@ const Index = () => {
         { body: { text: gptReply } }
       );
 
-      if (speechError || !speechData?.audioContent) {
+      if (speechError) {
         console.error('Speech error:', speechError);
-        toast({
-          title: 'Ошибка озвучивания',
-          description: 'Не удалось преобразовать текст в речь. Возможно, превышена квота API.',
-          variant: 'destructive',
-        });
-        
-        // Показать текстовый ответ вместо озвучивания
-        setStatusText(`AI: ${gptReply}`);
-        
-        // Продолжить слушать после паузы
-        setTimeout(async () => {
-          if (isActive) {
-            await startListening();
-          }
-        }, 3000);
-        return;
+        throw speechError;
       }
 
       // Play audio and start monitoring for interruption
